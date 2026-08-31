@@ -1,0 +1,30 @@
+name: Verilator UVM APB regression
+on: [push, pull_request, workflow_dispatch]
+jobs:
+  simulate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with: {submodules: recursive}
+      - name: Install build prerequisites
+        run: sudo apt-get update && sudo apt-get install -y autoconf bison flex libfl-dev g++ make help2man python3
+      - name: Build pinned Verilator
+        run: |
+          git clone https://github.com/verilator/verilator.git "$RUNNER_TEMP/verilator"
+          cd "$RUNNER_TEMP/verilator"
+          git checkout 848d926ebd4addacacd294dc84e35d9d4ae8078c
+          autoconf
+          ./configure
+          make -C src -j2 opt
+          echo "$RUNNER_TEMP/verilator/bin" >> "$GITHUB_PATH"
+          echo "VERILATOR_ROOT=$RUNNER_TEMP/verilator" >> "$GITHUB_ENV"
+      - name: Compile and run three seeds
+        run: make test JOBS=2
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: apb-simulation-results
+          path: |
+            build/*.log
+            build/*.vcd
